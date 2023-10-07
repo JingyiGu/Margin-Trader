@@ -1,4 +1,4 @@
-# Margin-Trader
+# Margin Trader (ICAIF 2023)
 
 Implementation of Margin Trader: A Reinforcement Learning Framework for Portfolio Management with Margin and Constraints.
 

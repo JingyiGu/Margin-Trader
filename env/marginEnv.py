@@ -13,9 +13,6 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 matplotlib.use("Agg")
 
-# from stable_baselines3.common.logger import Logger, KVWriter, CSVOutputFormat
-
-
 class MarginTradingEnv(gym.Env):
     """A stock trading environment for OpenAI gym"""
 
@@ -111,9 +108,9 @@ class MarginTradingEnv(gym.Env):
         def _do_sell_long_normal():
             if (
                 self.state[index + 2 * self.stock_dim + 2*3] != True
-            ):  # check if the stock is able to sell, for simlicity we just add it in techical index
+            ):  # check if the stock is able to sell, for simplicity we add it to technical index
                 # if self.state[index + 1] > 0: # if we use price<0 to denote a stock is unable to trade in that day, the total asset calculation may be wrong for the price is unreasonable
-                # Sell only if the price is > 0 (no missing data in this particular date)
+                # Sell only if the price is > 0 (no missing data on this particular date)
                 # perform sell action based on the sign of the action
                 if self.state[index + self.stock_dim + 2*3] > 0:
                     # Sell only if current asset is > 0
@@ -125,7 +122,7 @@ class MarginTradingEnv(gym.Env):
                         * sell_num_shares
                         * (1 - self.sell_cost_pct[index])
                     )
-                    # print('sell amount:', sell_amount)
+                    
                     # update balance
                     self.state[0] += sell_amount # cash
                     self.state[2] -= self.state[index + 2*3] * sell_num_shares * self.sell_cost_pct[index]
@@ -157,7 +154,7 @@ class MarginTradingEnv(gym.Env):
                             * sell_num_shares
                             * (1 - self.sell_cost_pct[index])
                         )
-                        # print('sell amount:', sell_amount)
+                       
                         # update balance
                         self.state[0] += sell_amount
                         self.state[2] -= self.state[index + 2*3] * sell_num_shares * self.sell_cost_pct[index]
@@ -170,10 +167,8 @@ class MarginTradingEnv(gym.Env):
                         self.trades += 1
                     else:
                         sell_num_shares = 0
-                        # print('sell amount:', 0)
                 else:
                     sell_num_shares = 0
-                    # print('sell amount:', 0)
             else:
                 sell_num_shares = _do_sell_long_normal()
         else:
@@ -190,9 +185,8 @@ class MarginTradingEnv(gym.Env):
                 # Buy only if the price is > 0 (no missing data in this particular date)
                 available_shares = self.state[0] // (
                     self.state[index + 2*3] * (1 + self.buy_cost_pct[index])
-                )  # when buying stocks, we should consider the cost of trading when calculating available_amount, or we may be have cash<0
-                # print('available_amount:{}'.format(available_amount))
-
+                )  # when buying stocks, we should consider the cost of trading when calculating available_amount, otherwise we may have cash<0
+                
                 # update balance
                 buy_num_shares = min(available_shares, action)
                 buy_amount = (
@@ -200,7 +194,6 @@ class MarginTradingEnv(gym.Env):
                     * buy_num_shares
                     * (1 + self.buy_cost_pct[index])
                 )
-                # print('buy amount:', buy_amount)
                 self.state[0] -= buy_amount
                 self.state[2] -= self.state[index + 2*3] * buy_num_shares * self.buy_cost_pct[index]
                 self.state[index + self.stock_dim + 2*3] += buy_num_shares
@@ -221,7 +214,6 @@ class MarginTradingEnv(gym.Env):
                 buy_num_shares = _do_long_buy()
             else:
                 buy_num_shares = 0
-                # print('buy amount:', 0)
                 pass
 
         return buy_num_shares
@@ -235,21 +227,17 @@ class MarginTradingEnv(gym.Env):
                 # sell only if the price is > 0 (no missing data in this particular date)
                 available_shares = self.state[3] // self.state[index + 2*3] 
                 # when selling short stocks, check current available limit
-                # print('available_amount:{}'.format(available_amount))
-
+                
                 # update balance
                 sell_num_shares = min(available_shares, abs(action))
                 sell_amount = (
                     self.state[index + 3*2]
                     * sell_num_shares
-                    # * (1 - self.sell_cost_pct[index])
                 )
-                # print('sell amount:', sell_amount)
                 self.state[3] -= sell_amount # limit
                 self.state[4] -= sell_amount * self.sell_cost_pct[index] # credit balance
                 self.state[5] -= sell_amount * self.sell_cost_pct[index] # equity
                 self.state[index + self.stock_dim + 2*3] -= sell_num_shares # holding shares
-                # print(self.state[2*3:index + 2*self.stock_dim + 2*3])
                 self.cost += (
                     self.state[index + 2*3] * sell_num_shares * self.sell_cost_pct[index]
                 )
@@ -287,7 +275,6 @@ class MarginTradingEnv(gym.Env):
                     buy_amount = (
                         self.state[index + 2*3]
                         * buy_num_shares
-                        # * (1 + self.buy_cost_pct[index])
                     )
                     # update balance
                     self.state[3] += buy_amount # limit
@@ -299,9 +286,6 @@ class MarginTradingEnv(gym.Env):
                         * buy_num_shares
                         * self.buy_cost_pct[index]
                     )
-                    # print('cost:',self.state[index + 2*3]
-                    #         * buy_num_shares
-                    #         * self.buy_cost_pct[index])
                     self.trades += 1
                 else:
                     buy_num_shares = 0
@@ -322,7 +306,6 @@ class MarginTradingEnv(gym.Env):
                         buy_amount = (
                             self.state[index + 3*2]
                             * buy_num_shares
-                            # * (1 + self.buy_cost_pct[index])
                         )
                         # update balance
                         self.state[3] += buy_amount
@@ -334,9 +317,6 @@ class MarginTradingEnv(gym.Env):
                             * buy_num_shares
                             * self.buy_cost_pct[index]
                         )
-                        # print('cost:',self.state[index + 2*3]
-                        #     * buy_num_shares
-                        #     * self.buy_cost_pct[index])
                         self.trades += 1
                     else:
                         buy_num_shares = 0
@@ -449,23 +429,18 @@ class MarginTradingEnv(gym.Env):
 
         else:
             # print('################ day: {} ################ '.format(self.day))
-            # print('State:', self.state[:2*3+self.stock_dim*2])
             actions = actions * self.hmax  # actions initially is scaled between -1 to 1
             actions = actions.astype(int)  # convert into integer because we can't by fraction of shares
-            # print('Actions from agent:', actions)
+
             # a stock can only be long or short
             actions = self._check_one_position_only(actions)
-            # print('Actions after combine long and short positions:', actions)
             long_actions = actions[:self.stock_dim]
             short_actions = actions[self.stock_dim:]
 
             begin_total_asset = self.state[2] + self.state[2+3]
-            # print("begin_total_asset:{}".format(begin_total_asset))
             
-
             
             ################ long position
-            # print('############## long position')
             if self.turbulence_threshold is not None:
                 if self.turbulence >= self.turbulence_threshold:
                     long_actions = np.array([-self.hmax] * self.stock_dim)
@@ -474,22 +449,14 @@ class MarginTradingEnv(gym.Env):
             sell_long_index = argsort_long_actions[: np.where(long_actions < 0)[0].shape[0]]
             buy_long_index = argsort_long_actions[::-1][: np.where(long_actions > 0)[0].shape[0]]
 
-            # print('selling!')
             for index in sell_long_index:
-                # print('stock index:', index)
                 long_actions[index] = self._sell_long_stock(index, long_actions[index]) * (-1)
-                # print('sell shares: ', long_actions[index])
-                # print(self.state[:2*3+self.stock_dim*2])
 
-            # print('buying!')
             for index in buy_long_index:
-                # print('stock index:', index)
                 long_actions[index] = self._buy_long_stock(index, long_actions[index])
 
             
-
             ############## short position
-            # print('############## short position')
             if self.turbulence_threshold is not None:
                 if self.turbulence >= self.turbulence_threshold:
                     short_actions = np.array([-self.hmax] * self.stock_dim)
@@ -499,7 +466,6 @@ class MarginTradingEnv(gym.Env):
             buy_short_index = argsort_short_actions[::-1][: np.where(short_actions > 0)[0].shape[0]]           
 
             for index in buy_short_index:
-                # print('stock index:', index)
                 short_actions[index] = self._buy_short_stock(index, short_actions[index])
 
 
@@ -544,22 +510,11 @@ class MarginTradingEnv(gym.Env):
                 sharpe = 0
 
             self.rewards_memory.append(self.reward)
-            # print(self.day)
-            # print(self.reward, sharpe)
-            # print(self.reward * self.reward_scaling, sharpe * self.penalty_sharpe)
-
-
             self.reward = self.reward * self.reward_scaling + sharpe * self.penalty_sharpe
-            # print(self.reward)
 
             self.state_memory.append(
                 self.state
             )  # add current state in state_recorder for each step
-
-            # print("end_total_asset:{}".format(end_total_asset))
-            
-            # print('reward:', self.reward)
-
 
         return self.state, self.reward, self.terminal, False, {}
 
@@ -573,8 +528,6 @@ class MarginTradingEnv(gym.Env):
         self.day = 0
         self.data = self.df.loc[self.day, :]
         self.state = self._initiate_margin_state()
-        
-        # self.state = self._initiate_state()
 
         if self.initial:
             self.asset_memory = [self.initial_amount]
@@ -687,20 +640,13 @@ class MarginTradingEnv(gym.Env):
                 
                 argsort_market = np.argsort(market)  # sort based on market value, index with small value first
                 argsort_long = argsort_market[-np.where(market>0)[0].shape[0]:] # start with the smallest long market
-                # print("update loan")
-                # print(market)
-                # print(loan_rest)
-                # print(argsort_market)
-                # print(argsort_long)
+               
                 for i in argsort_long:    
-                    # print(i)
-                    # print(self.state[:3*2+2*self.stock_dim])
                     self._sell_long_stock(i, self.state[self.stock_dim + 2*3 + i])  # sell the one with the lowest market value, change the market and cash in state in this process
-                    # print(self.state[:3*2+2*self.stock_dim])
+                    
                     if market[i] < loan_rest: 
                         loan_rest -= market[i]
                         self.state[0] = 0 # return cash to loan
-                        # print(self.state[:3*2+2*self.stock_dim])
                     else:
                         self.state[0] -= loan_rest # return cash to loan, and keep rest of cash
                         break  # if satisfied stop
@@ -713,8 +659,6 @@ class MarginTradingEnv(gym.Env):
         short_market = abs(sum(market[market < 0]))
         borrow_limit = limit + short_market
         borrow_diff = self.margin * short_equity - borrow_limit
-        # print('hit!!!')
-        # print(self.state[3:6])
 
         if borrow_diff > 0: # earn benefit, can short more         
             self.state[3] += borrow_diff # increase available limit
@@ -724,25 +668,16 @@ class MarginTradingEnv(gym.Env):
                 self.state[3] += borrow_diff
                 self.state[4] += borrow_diff              
             else: 
-                # print(borrow_diff)
-                # print(short_market)
-                # print(self.state[3:6])
                 borrow_rest = borrow_diff + limit
                 self.state[3] = 0 # first clear available limit              
                 argsort_market = np.argsort(market)  # sort based on market value, index with small value first
                 argsort_short = argsort_market[:np.where(market<0)[0].shape[0]][::-1] # start with the smallest long market
-                # print(market)
 
                 for i in argsort_short:
-                    # print(i)
                     self._buy_short_stock(i, abs(self.state[2*3 + self.stock_dim + i])) # holding shares<0, need to buy positive number
-                    # print(self.state[3:6])
                     if market[i] > borrow_rest: # both negative
                         borrow_rest += abs(market[i])
-                        self.state[3] = 0
-                        # print(self.state[3:6])
-                        # print(borrow_rest)
-                
+                        self.state[3] = 0                
                     else:
                         self.state[3] -= abs(borrow_rest)
                         break
@@ -825,8 +760,6 @@ class MarginTradingEnv(gym.Env):
     def save_asset_memory(self):
         date_list = self.date_memory
         asset_list = self.asset_memory
-        # print(len(date_list))
-        # print(len(asset_list))
         df_account_value = pd.DataFrame(
             {"date": date_list, "account_value": asset_list}
         )

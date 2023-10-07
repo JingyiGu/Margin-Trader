@@ -28,12 +28,6 @@ from finrl.config import (
     TENSORBOARD_LOG_DIR,
     RESULTS_DIR,
     INDICATORS,
-    TRAIN_START_DATE,
-    TRAIN_END_DATE,
-    TEST_START_DATE,
-    TEST_END_DATE,
-    TRADE_START_DATE,
-    TRADE_END_DATE,
 )
 
 now = datetime.datetime.now().strftime('%Y%m%d-%Hh%M')
@@ -67,13 +61,7 @@ TEST_END_DATE = '2020-04-30'
 TRADE_START_DATE = '2020-05-01'
 TRADE_END_DATE = '2023-05-01'
 
-# TRAIN_START_DATE = '2000-01-01'
-# TRAIN_END_DATE = '2018-12-31'
-# TEST_START_DATE = '2019-01-01'
-# TEST_END_DATE = '2020-04-30'
-# TRADE_START_DATE = '2020-05-01'
-# TRADE_END_DATE = '2023-05-01'
-
+os.makedir('./datasets', exist_ok=True)
 if os.path.exists('./datasets/data.csv'):
     processed = pd.read_csv('./datasets/data.csv',index_col=0)
 else:
@@ -147,7 +135,7 @@ trained_a2c = agent.train_model(model=model_a2c,
                                 total_timesteps=50000)
 trained_a2c.save(TRAINED_MODEL_DIR + "/agent_a2c.pth")
 
-
+############################## test (validation)
 e_test_gym = MarginTradingEnv(df = test, turbulence_threshold = 70,risk_indicator_col='vix', **env_kwargs)
 test_account_value_a2c, test_actions_a2c,test_state_a2c = DRLAgent.DRL_prediction(
     model=trained_a2c, 
@@ -198,8 +186,8 @@ plt.legend(loc='upper right')
 plt.savefig(RESULTS_DIR+"/profit_test.png")
 plt.clf()
 
-print("==============Compare to DJIA===========")
 
+############################## trade
 e_trade_gym = MarginTradingEnv(df = trade, turbulence_threshold = 70,risk_indicator_col='vix', **env_kwargs)
 trade_account_value_a2c, trade_actions_a2c, trade_state_a2c = DRLAgent.DRL_prediction(
     model=trained_a2c, 
@@ -230,6 +218,7 @@ dji = pd.merge(
 ).set_index("date")
 
 
+print("==============Compare to DJIA===========")
 trade_result_a2c = trade_account_value_a2c.set_index(trade_account_value_a2c.columns[0])
 result = pd.DataFrame(
     {

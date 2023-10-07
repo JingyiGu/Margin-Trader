@@ -82,7 +82,6 @@ class LongMarginTradingEnv(gym.Env):
         self.maintenance = maintenance
         self.penalty_sharpe = penalty_sharpe
         # initalize state
-        # self.state = self._initiate_state()
         self.state = self._initiate_margin_state()
 
         # initialize reward
@@ -113,7 +112,7 @@ class LongMarginTradingEnv(gym.Env):
         def _do_sell_long_normal():
             if (
                     self.state[index + 2 * self.stock_dim + 3] != True
-            ):  # check if the stock is able to sell, for simlicity we just add it in techical index
+            ):  # check if the stock is able to sell, for simplicity we just add it to technical index
                 # if self.state[index + 1] > 0: # if we use price<0 to denote a stock is unable to trade in that day, the total asset calculation may be wrong for the price is unreasonable
                 # Sell only if the price is > 0 (no missing data in this particular date)
                 # perform sell action based on the sign of the action
@@ -128,7 +127,6 @@ class LongMarginTradingEnv(gym.Env):
                             * (1 - self.sell_cost_pct[index])
                     )
                     # update balance
-                    # print('sell amount:', sell_amount)
                     self.state[0] += sell_amount  # cash
                     self.state[2] -= self.state[index + 3]  * sell_num_shares  * self.sell_cost_pct[index]
                     self.state[index + self.stock_dim + 3] -= sell_num_shares  # holding shares
@@ -140,10 +138,8 @@ class LongMarginTradingEnv(gym.Env):
                     self.trades += 1
                 else:
                     sell_num_shares = 0
-                    # print('sell amount:', 0)
             else:
                 sell_num_shares = 0
-                # print('sell amount:', 0)
 
             return sell_num_shares
 
@@ -161,7 +157,7 @@ class LongMarginTradingEnv(gym.Env):
                                 * sell_num_shares
                                 * (1 - self.sell_cost_pct[index])
                         )
-                        # print('sell amount:', sell_amount)
+                        
                         # update balance
                         self.state[0] += sell_amount
                         self.state[2] -= self.state[index + 3]  * sell_num_shares  * self.sell_cost_pct[index]
@@ -174,10 +170,8 @@ class LongMarginTradingEnv(gym.Env):
                         self.trades += 1
                     else:
                         sell_num_shares = 0
-                        # print('sell amount:', 0)
                 else:
                     sell_num_shares = 0
-                    # print('sell amount:', 0)
             else:
                 sell_num_shares = _do_sell_long_normal()
         else:
@@ -195,7 +189,7 @@ class LongMarginTradingEnv(gym.Env):
                 # Buy only if the price is > 0 (no missing data in this particular date)
                 available_shares = self.state[0] // (
                         self.state[index + 3] * (1 + self.buy_cost_pct[index])
-                )  # when buying stocks, we should consider the cost of trading when calculating available_amount, or we may be have cash<0
+                )  # when buying stocks, we should consider the cost of trading when calculating available_amount, otherwise we may have cash<0
                 # print('available_amount:{}'.format(available_amount))
 
                 # update balance
@@ -205,7 +199,6 @@ class LongMarginTradingEnv(gym.Env):
                         * buy_num_shares
                         * (1 + self.buy_cost_pct[index])
                 )
-                # print('buy amount:', buy_amount)
                 self.state[0] -= buy_amount
                 self.state[2] -= self.state[index + 3] * buy_num_shares * self.buy_cost_pct[index]
                 self.state[index + self.stock_dim + 3] += buy_num_shares
@@ -214,8 +207,7 @@ class LongMarginTradingEnv(gym.Env):
                 )
                 self.trades += 1
             else:
-                buy_num_shares = 0
-                # print('buy amount:', 0)               
+                buy_num_shares = 0            
 
             return buy_num_shares
 
@@ -309,18 +301,13 @@ class LongMarginTradingEnv(gym.Env):
             return self.state, self.reward, self.terminal, False, {}
 
         else:
-            # print('################ day: {} ################ '.format(self.day))
-            # print('State:', self.state[:3 + self.stock_dim * 3])
+            
             actions = actions * self.hmax  # actions initially is scaled between -1 to 1
             long_actions = actions.astype(int)  # convert into integer because we can't by fraction of shares
-            # print('Actions from agent:', actions)
-            # print('Actions after combine long and short positions:', actions)
-            
+                        
             begin_total_asset = self.state[2]  
-            # print("begin_total_asset:{}".format(begin_total_asset))
 
             ################ long position
-            # print('############## long position')
             if self.turbulence_threshold is not None:
                 if self.turbulence >= self.turbulence_threshold:
                     long_actions = np.array([-self.hmax] * self.stock_dim)
@@ -329,22 +316,16 @@ class LongMarginTradingEnv(gym.Env):
             sell_long_index = argsort_long_actions[: np.where(long_actions < 0)[0].shape[0]]
             buy_long_index = argsort_long_actions[::-1][: np.where(long_actions > 0)[0].shape[0]]
 
-            # print('selling!')
+            
             for index in sell_long_index:
-                # print('stock index:', index)
                 long_actions[index] = self._sell_long_stock(index, long_actions[index]) * (-1)
 
-            # print('buying!')
             for index in buy_long_index:
-                # print('stock index:', index)
                 long_actions[index] = self._buy_long_stock(index, long_actions[index])
-                # print('buy shares: ', long_actions[index])
-                # print(self.state)
 
             self.actions_memory.append(long_actions)
-            # check margin requirement every 30 days and update the equity, market and loan respectively
             
-
+            # check margin requirement every 30 days and update the equity, market and loan respectively
             if self.day != 0 and self.day % 30 == 0:
                 self._update_loan()
             else:
@@ -381,11 +362,6 @@ class LongMarginTradingEnv(gym.Env):
             self.state_memory.append(
                 self.state
             )
-            
-            # print("end_total_asset:{}".format(end_total_asset))
-
-            # print('reward:', self.reward)
-            
 
         return self.state, self.reward, self.terminal, False, {}
 
@@ -445,7 +421,6 @@ class LongMarginTradingEnv(gym.Env):
         return maintenance
 
     def _initiate_margin_state(self):
-        # equity_long = self.long_short_ratio / (self.long_short_ratio + 1) * self.initial_amount  # 50k
         equity_long = self.initial_amount
         available_cash_long = equity_long * self.margin  # 100k
         loan = equity_long * (self.margin - 1)  # 50k
@@ -477,7 +452,6 @@ class LongMarginTradingEnv(gym.Env):
             long_cash += loan_diff
             self.state[0:2] = [long_cash, loan]
         else:  # loss, need to return some cash to loan. if still not meet requirement, sell long
-            # return_cash = min(long_cash, abs(loan_diff))
             
             if long_cash > abs(loan_diff):
                 long_cash -= abs(loan_diff)
@@ -503,36 +477,25 @@ class LongMarginTradingEnv(gym.Env):
                 
     def _update_state(self):
 
-        if len(self.df.tic.unique()) > 1:
-
-            long_cash, loan = self.state[0], self.state[1]
-            market = np.array(self.data.close.values.tolist()) * np.array(
-                self.state[(self.stock_dim + 3): (self.stock_dim * 2 + 3)])
-            long_market = sum(market[market > 0])
-            long_equity = long_cash + long_market - loan
-            
-            # for multiple stock
-            state = (
-                    [long_cash, loan, long_equity]  #
-                    + self.data.close.values.tolist()
-                    + list(self.state[(self.stock_dim + 3): (self.stock_dim * 2 + 3)])
-                    + sum(
-                (
-                    self.data[tech].values.tolist()
-                    for tech in self.tech_indicator_list
-                ),
-                [],
-            )
-            )
-        else:
-            # for single stock
-            state = (
-                    [self.state[0]]
-                    + [self.data.close]
-                    + list(self.state[(self.stock_dim + 1): (self.stock_dim * 2 + 1)])
-                    + sum(([self.data[tech]] for tech in self.tech_indicator_list), [])
-            )
-
+        long_cash, loan = self.state[0], self.state[1]
+        market = np.array(self.data.close.values.tolist()) * np.array(
+            self.state[(self.stock_dim + 3): (self.stock_dim * 2 + 3)])
+        long_market = sum(market[market > 0])
+        long_equity = long_cash + long_market - loan
+        
+        state = (
+                [long_cash, loan, long_equity]  #
+                + self.data.close.values.tolist()
+                + list(self.state[(self.stock_dim + 3): (self.stock_dim * 2 + 3)])
+                + sum(
+            (
+                self.data[tech].values.tolist()
+                for tech in self.tech_indicator_list
+            ),
+            [],
+        )
+        )
+        
         return state
 
     def _get_date(self):

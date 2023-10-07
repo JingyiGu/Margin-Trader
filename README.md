@@ -9,6 +9,6 @@ Implementation of Margin Trader: A Reinforcement Learning Framework for Portfoli
 
 ## Training
 ```Python
-python train_margin_a2c.py
+python trading_margin_a2c.py
 ```
 The dataset will be automatically downloaded on the first run.

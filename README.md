@@ -12,3 +12,15 @@ Implementation of Margin Trader: A Reinforcement Learning Framework for Portfoli
 python trading_margin_a2c.py
 ```
 The dataset will be automatically downloaded on the first run.
+
+## Citation
+If you use this code for your research, please kindly cite our paper:
+```
+@inproceedings{gu2023margin,
+  title={Margin Trader: A Reinforcement Learning Framework for Portfolio Management with Margin and Constraints},
+  author={Gu, Jingyi and Du, Wenlu and Rahman, AM Muntasir and Wang, Guiling},
+  booktitle={Proceedings of the Fourth ACM International Conference on AI in Finance},
+  pages={610--618},
+  year={2023}
+}
+```

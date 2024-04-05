@@ -10,6 +10,8 @@ import pandas as pd
 from gymnasium import spaces
 from gymnasium.utils import seeding
 from stable_baselines3.common.vec_env import DummyVecEnv
+import math
+from datetime import datetime
 
 matplotlib.use("Agg")
 
@@ -45,6 +47,9 @@ class MarginTradingEnv(gym.Env):
         model_name="",
         mode="",
         iteration="",
+        partialtrade: bool = False, # allow partial trade when update power
+        period = "Day", # can be Day, Week, Month, or Year 
+        num_periods = 30,       
     ):
         self.day = day
         self.df = df
@@ -77,6 +82,10 @@ class MarginTradingEnv(gym.Env):
         self.long_short_ratio = long_short_ratio # 1
         self.maintenance = maintenance # 0.4
         self.penalty_sharpe = penalty_sharpe
+        self.partialtrade = partialtrade 
+        self.period = period # Day
+        self.num_periods = num_periods # 30
+        
         # initalize state
         self.state = self._initiate_margin_state()
 
@@ -103,6 +112,14 @@ class MarginTradingEnv(gym.Env):
         #         self.logger = Logger('results',[CSVOutputFormat])
         # self.reset()
         self._seed()
+        
+        #Initialize date
+        date_info = datetime.strptime(self.df.loc[self.day , "date"].iloc[0,], "%Y-%m-%d")
+        self.weekday = date_info.isocalendar().weekday
+        self.week = date_info.isocalendar().week
+        self.month = date_info.month
+        self.year = date_info.isocalendar().year
+        self.period_counter = 0
 
     def _sell_long_stock(self, index, action):
         def _do_sell_long_normal():
@@ -475,14 +492,37 @@ class MarginTradingEnv(gym.Env):
             self.actions_memory.append(np.concatenate([long_actions,short_actions]))
 
 
-            if self.day != 0 and self.day % 30 == 0:
+            cur_date_info = datetime.strptime(self.df.loc[self.day , "date"].iloc[0,], "%Y-%m-%d")
+
+            
+            match self.period:
+                case "Day":
+                    if self.day != 0 and self.day % self.num_periods == 0:
+                        self.period_counter = self.num_periods
+                case "Week":
+                    if self.week != cur_date_info.isocalendar().week:
+                        self.period_counter += 1                  
+                case "Month":
+                    if self.month != cur_date_info.month:
+                        self.period_counter += 1
+                case "Year":
+                    if self.year != cur_date_info.year:
+                        self.period_counter += 1
+
+            self.weekday = cur_date_info.isocalendar().weekday
+            self.week = cur_date_info.isocalendar().week
+            self.month = cur_date_info.month
+            self.year = cur_date_info.isocalendar().year
+
+            if self.period_counter >= self.num_periods:
                 self._update_loan()
                 self._update_credit()
+                self.period_counter = 0
             else:
                 if self._check_long_maintenance() < 0.3:
                     self._update_loan()
                 if self._check_short_maintenance() < 0.3:
-                    self._update_credit()
+                    self._update_credit()          
 
             ############## state: s -> s+1
             self.day += 1
@@ -640,17 +680,34 @@ class MarginTradingEnv(gym.Env):
                 
                 argsort_market = np.argsort(market)  # sort based on market value, index with small value first
                 argsort_long = argsort_market[-np.where(market>0)[0].shape[0]:] # start with the smallest long market
-               
-                for i in argsort_long:    
-                    self._sell_long_stock(i, self.state[self.stock_dim + 2*3 + i])  # sell the one with the lowest market value, change the market and cash in state in this process
-                    
-                    if market[i] < loan_rest: 
-                        loan_rest -= market[i]
-                        self.state[0] = 0 # return cash to loan
-                    else:
-                        self.state[0] -= loan_rest # return cash to loan, and keep rest of cash
-                        break  # if satisfied stop
-                self.state[1] -= abs(loan_diff)
+                
+                if self.partialtrade == True:
+                    for i in argsort_long: 
+                        predicted_sell_amount = self.state[2*3 + i] * self.state[self.stock_dim + 2*3 + i] * (1 - self.sell_cost_pct[i])
+                        
+                        if predicted_sell_amount < loan_rest: 
+                            self._sell_long_stock(i, self.state[self.stock_dim + 2*3 + i]) 
+                            loan_rest -= predicted_sell_amount
+                            self.state[0] = 0 
+                        else:
+                            predicted_share_count = math.ceil(loan_rest / (self.state[2*3 + i] * (1 - self.sell_cost_pct[i])))
+                            self._sell_long_stock(
+                                i, predicted_share_count)
+                            self.state[0] -= loan_rest 
+                            break  
+                    self.state[1] -= abs(loan_diff)
+                
+                else:
+                    for i in argsort_long:    
+                        self._sell_long_stock(i, self.state[self.stock_dim + 2*3 + i])  # sell the one with the lowest market value, change the market and cash in state in this process
+                        
+                        if market[i] < loan_rest: 
+                            loan_rest -= market[i]
+                            self.state[0] = 0 # return cash to loan
+                        else:
+                            self.state[0] -= loan_rest # return cash to loan, and keep rest of cash
+                            break  # if satisfied stop
+                    self.state[1] -= abs(loan_diff)
           
     def _update_credit(self):
         limit, credit, short_equity = self.state[3], self.state[4], self.state[5]
@@ -672,16 +729,32 @@ class MarginTradingEnv(gym.Env):
                 self.state[3] = 0 # first clear available limit              
                 argsort_market = np.argsort(market)  # sort based on market value, index with small value first
                 argsort_short = argsort_market[:np.where(market<0)[0].shape[0]][::-1] # start with the smallest long market
-
-                for i in argsort_short:
-                    self._buy_short_stock(i, abs(self.state[2*3 + self.stock_dim + i])) # holding shares<0, need to buy positive number
-                    if market[i] > borrow_rest: # both negative
-                        borrow_rest += abs(market[i])
-                        self.state[3] = 0                
-                    else:
-                        self.state[3] -= abs(borrow_rest)
-                        break
-                self.state[4] -= abs(borrow_diff)
+                
+                if self.partialtrade == True:
+                    for i in argsort_short:                   
+                        predicted_buy_amount = self.state[2*3 + i] * self.state[self.stock_dim + 2*3 + i]
+                        if predicted_buy_amount > borrow_rest: 
+                            self._buy_short_stock(i, abs(self.state[2*3 + self.stock_dim + i]))
+                            borrow_rest += abs(predicted_buy_amount)
+                            self.state[3] = 0                
+                        else:
+                            predicted_share_count = math.ceil(abs(borrow_rest) / (self.state[2*3 + i] ))
+                            self._buy_short_stock(
+                                i, predicted_share_count)                       
+                            self.state[3] -= abs(borrow_rest)
+                            break
+                    self.state[4] -= abs(borrow_diff)
+                
+                else:
+                    for i in argsort_short:
+                        self._buy_short_stock(i, abs(self.state[2*3 + self.stock_dim + i])) # holding shares<0, need to buy positive number
+                        if market[i] > borrow_rest: # both negative
+                            borrow_rest += abs(market[i])
+                            self.state[3] = 0                
+                        else:
+                            self.state[3] -= abs(borrow_rest)
+                            break
+                    self.state[4] -= abs(borrow_diff)
 
 
 

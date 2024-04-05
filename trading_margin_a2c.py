@@ -61,7 +61,7 @@ TEST_END_DATE = '2020-04-30'
 TRADE_START_DATE = '2020-05-01'
 TRADE_END_DATE = '2023-05-01'
 
-os.makedir('./datasets', exist_ok=True)
+os.makedirs('./datasets', exist_ok=True)
 if os.path.exists('./datasets/data.csv'):
     processed = pd.read_csv('./datasets/data.csv',index_col=0)
 else:
